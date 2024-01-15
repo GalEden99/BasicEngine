@@ -92,9 +92,6 @@
 			else
 				Clear(0,0,0,0);
 		}
-		
-		printf("pickedShape = %d\n",pickedShape);
-		printf("Num of shapes = %d\n",shapes.size());
 
 		for (unsigned int i=0; i<shapes.size();i++)
 		{

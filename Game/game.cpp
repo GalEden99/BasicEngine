@@ -27,7 +27,6 @@ void Game::Init()
 	AddShader("../res/shaders/pickingShader");	
 	AddShader("../res/shaders/basicShader");
 	
-	// AddTexture("../res/textures/box0.bmp",false);
 
 	AddTexture("../res/textures/lena256.jpg",false, 0);
 	AddTexture("../res/textures/lena256.jpg",false, 1);

@@ -7,156 +7,116 @@
 #include <iostream>
 #include <fstream>
 
-static unsigned char *sobel(unsigned char *data) {
-    int len = strlen((char *) data) / 4;
-    int sqr = sqrt(len);
+static unsigned char* sobel(unsigned char* data, int width, int height)
+{
+    int len = width * height;
+    int sqr = std::sqrt(len);
+    
+    int sobelX[] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
+    int sobelY[] = {-1, -2, -1, 0, 0, 0, 1, 2, 1};
+    unsigned char* sobeldImage = new unsigned char[len];
+    int kernelSize = 3;
 
-    double mat[sqr + 2][sqr + 2];
-    for (int i = 1; i < sqr + 1; i++) {
-        for (int j = 1; j < sqr + 1; j++) {
-            mat[i][j] = (data[4 * (i * sqr + j)] + data[4 * (i * sqr + j) + 1] + data[4 * (i * sqr + j) + 2]) / 3.0;
+    for (int y = 1; y < sqr - 1; ++y) {
+        for (int x = 1; x < sqr - 1; ++x) {
+            int sumX = 0;
+            int sumY = 0;
+
+            for (int ky = 0; ky < kernelSize; ++ky) {
+                for (int kx = 0; kx < kernelSize; ++kx) {
+                    int offsetX = x + kx - 1;
+                    int offsetY = y + ky - 1;
+                    int pixelValue = data[offsetY * sqr + offsetX];
+
+                    sumX += pixelValue * sobelX[ky * kernelSize + kx];
+                    sumY += pixelValue * sobelY[ky * kernelSize + kx];
+                }
+            }
+
+            int magnitude = std::sqrt(sumX * sumX + sumY * sumY);
+            unsigned char edgePixel = (magnitude > 128) ? 255 : 0;
+            sobeldImage[y * sqr + x] = edgePixel;
         }
     }
+    return sobeldImage;
+}
 
-    float mat2[sqr + 2][sqr + 2];
+static unsigned char* halftone(unsigned char* data, int width, int height) {
+    int len = width * height;
+    int sqr = std::sqrt(len);
+    unsigned char* outputImage = new unsigned char[len];
 
+    for (int i = 0; i < sqr; i++) {
+        for (int j = 0; j < sqr; j++) {
+            float curr = (float)data[i * sqr + j] / (float)255;
+            unsigned char value = 0;
 
-    ///// insert gaussian
-
-    float gaussKernel[3][3] = {{1, 2, 1},
-                               {2, 4, 2},
-                               {1, 2, 1}};
-
-    for (int i = 1; i < sqr + 2; i++) {
-        for (int j = 1; j < sqr + 2; j++) {
-            float newPixel = mat[i - 1][j - 1] * gaussKernel[0][0] +
-                             mat[i - 1][j] * gaussKernel[0][1] +
-                             mat[i - 1][j + 1] * gaussKernel[0][2] +
-                             mat[i][j - 1] * gaussKernel[1][0] +
-                             mat[i][j] * gaussKernel[1][1] +
-                             mat[i][j + 1] * gaussKernel[1][2] +
-                             mat[i + 1][j - 1] * gaussKernel[2][0] +
-                             mat[i + 1][j] * gaussKernel[2][1] +
-                             mat[i + 1][j + 1] * gaussKernel[2][2];
-
-            mat2[i][j] = newPixel / 16.0;
-        }
-    }
-
-    //// sobel
-
-    float gx[3][3] = {{-1, 0, 1},
-                      {-2, 0, 2},
-                      {-1, 0, 1}};
-    float gy[3][3] = {{1,  2,  1},
-                      {0,  0,  0},
-                      {-1, -2, -1}};
-
-
-    float mat3[sqr + 2][sqr + 2];
-    double angles[sqr + 2][sqr + 2];
-
-    for (int i = 1; i < sqr + 2; i++) {
-        for (int j = 1; j < sqr + 2; j++) {
-            float newPixelGx = mat2[i - 1][j - 1] * gx[0][0] +
-                               mat2[i - 1][j + 1] * gx[0][2] +
-                               mat2[i + 1][j - 1] * gx[2][0] +
-                               mat2[i + 1][j + 1] * gx[2][2] +
-                               mat2[i][j - 1] * gx[1][0] +
-                               mat2[i][j + 1] * gx[1][2];
-            float newPixelGy = mat2[i - 1][j - 1] * gy[0][0] +
-                               mat2[i - 1][j] * gy[0][1] +
-                               mat2[i - 1][j + 1] * gy[0][2] +
-                               mat2[i + 1][j - 1] * gy[2][0] +
-                               mat2[i + 1][j] * gy[2][1] +
-                               mat2[i + 1][j + 1] * gy[2][2];
-            float newPixel = (std::sqrt(newPixelGx * newPixelGx + newPixelGy * newPixelGy));
-
-                mat3[i][j] = newPixel;
-
-                float angle = (std::atan2(newPixelGy, newPixelGx));
-                angles[i][j] = angle;
-
-        }
-    }
-
-    //// non max
-
-    float mat4[sqr + 2][sqr + 2];
-    int ang = 180;
-
-    for (int i = 1; i < sqr - 1; i++) {
-        for (int j = 1; j < sqr - 1; j++) {
-            float p1;
-            float p2;
-            float curr = mat3[i][j];
-            double direction = angles[i][j];
-            if ((0 <= direction < ang/8) || (15 * ang/8 <= direction <= 2 * ang)) {
-                p1 = mat3[i][j - 1];
-                p2 = mat3[i][j + 1];
-            } else if ((ang/8 <= direction * 3 * ang/8) || (9 * ang / 8 <= direction < 11 * ang/8)) {
-                p1 = mat3[i + 1][j - 1];
-                p2 = mat3[i - 1][j + 1];
-            } else if ((3 * ang/8 <= direction < 5 * ang/8) || (11 * ang / 8 <= direction < 13 * ang/8)) {
-                p1 = mat3[i - 1][j];
-                p2 = mat3[i + 1][j];
+            if (curr < 0.2) {
+                value = 0;
+            } else if (curr < 0.4) {
+                value = 85;
+            } else if (curr < 0.6) {
+                value = 170;
+            } else if (curr < 0.8) {
+                value = 255;
             } else {
-                p1 = mat3[i + 1][j - 1];
-                p2 = mat3[i - 1][j + 1];
+                value = 255;
             }
-            if (curr >= p1 && curr >= p2) {
-                mat4[i][j] = curr;
-            } else {
-                mat4[i][j] = 0;
-            }
+
+            outputImage[(2 * i) * sqr + (2 * j)] = value;
+            outputImage[(2 * i + 1)* sqr + (2 * j)] = value;
+            outputImage[(2 * i) * sqr + (2 * j + 1)] = value;
+            outputImage[(2 * i + 1) * sqr + (2 * j + 1)] = value;
         }
     }
 
-    float highThreshold = 180;
-    float lowThreshold = 120;
+    return outputImage;
+}
 
-    for (int i = 0; i < sqr + 1; i++) {
-        for (int j = 0; j < sqr + 1; j++) {
-            if (mat4[i][j] > highThreshold) {
-                mat4[i][j] = 255;
-            } else if (mat4[i][j] > lowThreshold) {
-                mat4[i][j] = 25;
-            } else {
-                mat4[i][j] = 0;
-            }
-        }
+static unsigned char* convertImageToGreyScale(unsigned char* data,int width,int height) {
+    int len = width * height;
+    int sqr = std::sqrt(len);
+    unsigned char* outputImage = new unsigned char[len];
+
+    for (int i = 0; i < len; ++i) {
+        int r = data[i * 4 + 0];
+        int g = data[i * 4 + 1];
+        int b = data[i * 4 + 2];
+
+        outputImage[i] = (r + g + b) / 3;
     }
+    return outputImage;
+}
 
-
-    for (int i = 0; i < sqr + 1; i++) {
-        for (int j = 0; j < sqr + 1; j++) {
-            if (mat4[i][j] == 25) {
-                if ((mat4[i + 1][j - 1] == 255) || (mat4[i + 1][j] == 255) || (mat4[i + 1][j + 1] == 255)
-                    || (mat4[i][j - 1] == 255) || (mat4[i][j + 1] == 255)
-                    || (mat4[i - 1][j - 1] == 255) || (mat4[i - 1][j] == 255) || (mat4[i - 1][j + 1] == 255))
-                    mat4[i][j] = 255;
-                else
-                    mat4[i][j] = 0;
-            }
-        }
-    }
-
-    unsigned char *data2 = new unsigned char[len * 4];
+ static unsigned char* convertGrayScaleToColor(unsigned char* greyedImage,unsigned char* orginalData,int width,int height ) {
+    int orginalLen = width * height * 4;
+    int len = width * height;
+    int sqr = std::sqrt(len);
+    unsigned char* outputImage = new unsigned char[orginalLen];
     int index = 0;
     for (int i = 1; i < sqr + 1; i++) {
         for (int j = 1; j < sqr + 1; j++) {
-            data2[index] = mat4[i][j];
-            data2[index + 1] = mat4[i][j];
-            data2[index + 2] = mat4[i][j];
-            data2[index + 3] = data[4 * (i * sqr + j) + 3];
+            outputImage[index] = greyedImage[i*sqr + j];
+            outputImage[index + 1] = greyedImage[i*sqr + j];
+            outputImage[index + 2] = greyedImage[i*sqr + j];
+            outputImage[index + 3] = orginalData[4 * (i * sqr + j) + 3];
             index += 4;
         }
     }
+    return outputImage;
+}  
 
-
-    return data2;
+static void printImage(unsigned char* data) {
+    int len = strlen((char *) data);
+    int sqr = std::sqrt(len);
+    for (int i = 0; i < sqr; i++) {
+        for (int j = 0; j < sqr; j++) {
+            printf("%d ", data[i*sqr + j]);
+        }
+        printf("\n");
+    }
+        printf("len: %d\n", len);
 }
-
 
 Texture::Texture(const std::string& fileName)
 {
@@ -180,52 +140,31 @@ Texture::Texture(const std::string& fileName)
 }
 
 
-std::vector<unsigned char> GetEdgesImage(const unsigned char* data, int width, int height)
-{
-    std::vector<unsigned char> edgesImage(width * height, 0);
-
-    for (int y = 1; y < height - 1; y++)
-    {
-        for (int x = 1; x < width - 1; x++)
-        {
-            int gx = data[(y - 1) * width + (x + 1)] + 2 * data[y * width + (x + 1)] + data[(y + 1) * width + (x + 1)]
-                - data[(y - 1) * width + (x - 1)] - 2 * data[y * width + (x - 1)] - data[(y + 1) * width + (x - 1)];
-
-            int gy = data[(y + 1) * width + (x - 1)] + 2 * data[(y + 1) * width + x] + data[(y + 1) * width + (x + 1)]
-                - data[(y - 1) * width + (x - 1)] - 2 * data[(y - 1) * width + x] - data[(y - 1) * width + (x + 1)];
-
-            int gradient = std::sqrt(gx * gx + gy * gy);
-
-            if (gradient > 128)
-            {
-                edgesImage[y * width + x] = 255;
-            }
-        }
-    }
-
-    return edgesImage;
-}
-
-
 Texture::Texture(const std::string& fileName,bool for2D,int textureIndx)
 {
     int width, height, numComponents;
     unsigned char* data = stbi_load((fileName).c_str(), &width, &height, &numComponents, 4);
 
+    unsigned char* greyed;
+    unsigned char* sobeled;
+
     switch(textureIndx){
         case 0:
-        std::printf("Texture 0\n");
             break;
         case 1:
-        std::printf("Texture 1\n");
-        data = sobel(data);
+            printf("sobel\n");
+            greyed = convertImageToGreyScale(data,width,height);
+            sobeled = halftone(greyed,width,height);
+            data = convertGrayScaleToColor(sobeled, data,width,height);
             break;
         case 2:
-        std::printf("Texture 2\n");
+        printf("halftome\n");
+            greyed = convertImageToGreyScale(data,width,height);
+            sobeled = halftone(greyed,width,height);
+            data = convertGrayScaleToColor(greyed, data,width,height);
             break;
         case 3:
-        std::printf("Texture 3\n");
-            break;
+          break;
     }
     
     if(data == NULL)
