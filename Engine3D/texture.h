@@ -9,6 +9,7 @@ class Texture
 public:
 	Texture(const std::string& fileName);
 	Texture(int width, int height,unsigned char *data);
+	Texture(const std::string& fileName,bool for2D,int textureIndx);
 	void Bind(int slot);
 	inline int GetSlot(){return m_texture;}
 	 ~Texture();

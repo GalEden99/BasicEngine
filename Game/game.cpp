@@ -27,13 +27,23 @@ void Game::Init()
 	AddShader("../res/shaders/pickingShader");	
 	AddShader("../res/shaders/basicShader");
 	
-	AddTexture("../res/textures/box0.bmp",false);
+	// AddTexture("../res/textures/box0.bmp",false);
+
+	AddTexture("../res/textures/lena256.jpg",false, 0);
+	AddTexture("../res/textures/lena256.jpg",false, 1);
+	AddTexture("../res/textures/lena256.jpg",false, 2);
+	AddTexture("../res/textures/lena256.jpg",false, 3);
 
 	AddShape(Plane,-1,TRIANGLES);
-	
-	pickedShape = 0;
-	
-	SetShapeTex(0,0);
+	AddShape(Plane,-1,TRIANGLES);
+	AddShape(Plane,-1,TRIANGLES);
+	AddShape(Plane,-1,TRIANGLES);
+	for (int i = 0; i < 4; i++)
+	{
+		pickedShape = i;
+		SetShapeTex(i,i);
+	}
+
 	MoveCamera(0,zTranslate,10);
 	pickedShape = -1;
 	

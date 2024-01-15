@@ -62,9 +62,9 @@
 		shaders.push_back(new Shader(fileName));
 	}
 
-	void Scene::AddTexture(const std::string& textureFileName,bool for2D)
+	void Scene::AddTexture(const std::string& textureFileName,bool for2D,int textureIndx)
 	{
-		textures.push_back(new Texture(textureFileName));
+		textures.push_back(new Texture(textureFileName,for2D,textureIndx));
 	}
 
 	void Scene::AddTexture(int width,int height, unsigned char *data)
@@ -92,12 +92,32 @@
 			else
 				Clear(0,0,0,0);
 		}
+		
+		printf("pickedShape = %d\n",pickedShape);
+		printf("Num of shapes = %d\n",shapes.size());
 
 		for (unsigned int i=0; i<shapes.size();i++)
 		{
 			if(shapes[i]->Is2Render())
 			{
 				glm::mat4 Model = Normal * shapes[i]->MakeTrans();
+
+				switch (i)
+				{
+					case 0:
+						glViewport(0,0,256,256);
+					break;
+					case 1:
+						glViewport(0,256,256,256);
+					break;
+					case 2:
+						glViewport(256,0,256,256);
+					break;
+					case 3:
+						glViewport(256,256,256,256);
+					break;
+
+				}
 				
 				if(shaderIndx > 0)
 				{
