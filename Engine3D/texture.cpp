@@ -7,6 +7,7 @@
 #include <iostream>
 #include <fstream>
 
+
 static unsigned char* sobel(unsigned char* data, int width, int height)
 {
     int len = width * height;
@@ -45,32 +46,73 @@ static unsigned char* halftone(unsigned char* data, int width, int height) {
     int len = width * height;
     int sqr = std::sqrt(len);
     unsigned char* outputImage = new unsigned char[len];
-
-    for (int i = 0; i < sqr; i++) {
-        for (int j = 0; j < sqr; j++) {
-            float curr = (float)data[i * sqr + j] / (float)255;
-            unsigned char value = 0;
-
-            if (curr < 0.2) {
-                value = 0;
-            } else if (curr < 0.4) {
-                value = 85;
-            } else if (curr < 0.6) {
-                value = 170;
-            } else if (curr < 0.8) {
-                value = 255;
-            } else {
-                value = 255;
+    
+    for (int i = 0; i< sqr; i+=2){
+        for (size_t j = 0; j < sqr; j+=2)
+        {
+          int pix1 = data[i*sqr + j];
+          int pix2 = data[i*sqr + j+1];
+          int pix3 = data[(i+1)*sqr + j];
+          int pix4 = data[(i+1)*sqr + j+1];
+          int avg = (pix1 + pix2 + pix3 + pix4) / 4;
+            if (avg < 50) {
+                outputImage[i*sqr + j] = 0;
+                outputImage[i*sqr + j+1] = 0;
+                outputImage[(i+1)*sqr + j] = 0;
+                outputImage[(i+1)*sqr + j+1] = 0;
+            } else if (avg < 100) {
+                outputImage[i*sqr + j] = 0;
+                outputImage[i*sqr + j+1] = 0;
+                outputImage[(i+1)*sqr + j] = 0;
+                outputImage[(i+1)*sqr + j+1] =  255;
+            } else if (avg < 150) {
+                outputImage[i*sqr + j] = 0;
+                outputImage[i*sqr + j+1] = 255;
+                outputImage[(i+1)*sqr + j] = 0;
+                outputImage[(i+1)*sqr + j+1] =  255;
+            } else if (avg < 200) {
+                outputImage[i*sqr + j] = 0;
+                outputImage[i*sqr + j+1] = 255;
+                outputImage[(i+1)*sqr + j] = 255;
+                outputImage[(i+1)*sqr + j+1] = 255;
+            }else {
+                outputImage[i*sqr + j] = 255;
+                outputImage[i*sqr + j+1] = 255;
+                outputImage[(i+1)*sqr + j] = 255;
+                outputImage[(i+1)*sqr + j+1] = 255;
             }
-
-            outputImage[(2 * i) * sqr + (2 * j)] = value;
-            outputImage[(2 * i + 1)* sqr + (2 * j)] = value;
-            outputImage[(2 * i) * sqr + (2 * j + 1)] = value;
-            outputImage[(2 * i + 1) * sqr + (2 * j + 1)] = value;
         }
     }
-
     return outputImage;
+}
+
+static unsigned char* floyd(unsigned char* data, int width, int height) {
+    int len = width * height;
+    unsigned char* outputImage = new unsigned char[len];
+    for (int i = 0; i< width; i++){
+        for (size_t j = 0; j < height; j++)
+        {
+            int oldPixel = data[i*height + j];
+            int newPixel = (oldPixel / 16) * 16;
+            outputImage[i*height + j] = newPixel;
+
+            int quantError = oldPixel - newPixel;
+            if (j < height - 1) {
+                outputImage[i*height + j + 1] += quantError * 7 / 16;
+            }
+            if (i < width - 1) {
+                if (j > 0) {
+                    outputImage[(i + 1)*height + j - 1] += quantError * 3 / 16;
+                }
+                outputImage[(i + 1)*height + j] += quantError * 5 / 16;
+                if (j < width - 1) {
+                    outputImage[(i + 1)*width + j + 1] += quantError * 1 / 16;
+                }
+            }
+        }
+    }
+    return outputImage;
+    
 }
 
 static unsigned char* convertImageToGreyScale(unsigned char* data,int width,int height) {
@@ -88,7 +130,7 @@ static unsigned char* convertImageToGreyScale(unsigned char* data,int width,int 
     return outputImage;
 }
 
- static unsigned char* convertGrayScaleToColor(unsigned char* greyedImage,unsigned char* orginalData,int width,int height ) {
+static unsigned char* convertGrayScaleToColor(unsigned char* greyedImage,unsigned char* orginalData,int width,int height ) {
     int orginalLen = width * height * 4;
     int len = width * height;
     int sqr = std::sqrt(len);
@@ -105,6 +147,42 @@ static unsigned char* convertImageToGreyScale(unsigned char* data,int width,int 
     }
     return outputImage;
 }  
+
+void printToFileGreyScale (char* fileName ,unsigned char* data,int width,int height) {
+        std::ofstream outputFile(fileName);
+        if (outputFile.is_open())
+        {
+            printf("file opened\n");
+            for (int i = 0; i < width; i++)
+            {
+                for (int j = 0; j < height; j++)
+                {
+                    outputFile << data[i * height + j] / 17 << ",";
+                }
+            }
+            outputFile.close();
+        }
+        else {
+            printf("Unable to open file");
+        }
+}
+
+void printToFileBlackWhitevoid (char* fileName ,unsigned char* data,int width,int height) {
+        std::ofstream outputFile(fileName);
+        if (outputFile.is_open())
+        {
+            for (int i = 0; i < width; i++)
+            {
+                for (int j = 0; j < height; j++)
+                {
+                    int value = data[i * height + j] == 255 ? 1 : 0;
+                    outputFile << value << ",";
+                }
+            }
+            outputFile.close();
+        }
+}
+
 
 static void printImage(unsigned char* data) {
     int len = strlen((char *) data);
@@ -150,20 +228,24 @@ Texture::Texture(const std::string& fileName,bool for2D,int textureIndx)
 
     switch(textureIndx){
         case 0:
-            break;
-        case 1:
-            printf("sobel\n");
             greyed = convertImageToGreyScale(data,width,height);
             sobeled = halftone(greyed,width,height);
             data = convertGrayScaleToColor(sobeled, data,width,height);
+            printToFileBlackWhitevoid("img5.txt",sobeled,width,height);
+            break;
+        case 1:
             break;
         case 2:
-        printf("halftome\n");
             greyed = convertImageToGreyScale(data,width,height);
-            sobeled = halftone(greyed,width,height);
-            data = convertGrayScaleToColor(greyed, data,width,height);
+            sobeled = floyd(greyed,width,height);
+            data = convertGrayScaleToColor(sobeled, data,width,height);
+            printToFileGreyScale("img6.txt",sobeled,width,height);
             break;
         case 3:
+            greyed = convertImageToGreyScale(data,width,height);
+            sobeled = sobel(greyed,width,height);
+            data = convertGrayScaleToColor(sobeled, data,width,height);
+            printToFileBlackWhitevoid("img4.txt",sobeled,width,height);
           break;
     }
     
