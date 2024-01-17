@@ -159,7 +159,7 @@ void printToFileGreyScale (char* fileName ,unsigned char* data,int width,int hei
                 {
                     outputFile << data[i * height + j] / 17 << ",";
                 }
-                printf("\n");
+                outputFile << "\n";
             }
             outputFile.close();
         }
@@ -179,7 +179,7 @@ void printToFileBlackWhitevoid (char* fileName ,unsigned char* data,int width,in
                     int value = data[i * height + j] == 255 ? 1 : 0;
                     outputFile << value << ",";
                 }
-                printf("\n");
+                outputFile << "\n";
             }
             outputFile.close();
         }
