@@ -27,12 +27,13 @@ void Game::Init()
 	AddShader("../res/shaders/pickingShader");	
 	AddShader("../res/shaders/basicShader");
 	
-
+	// Added 4 textures of lena 
 	AddTexture("../res/textures/lena256.jpg",false, 0);
 	AddTexture("../res/textures/lena256.jpg",false, 1);
 	AddTexture("../res/textures/lena256.jpg",false, 2);
 	AddTexture("../res/textures/lena256.jpg",false, 3);
 
+	// Loaded 4 shapes of lena 
 	AddShape(Plane,-1,TRIANGLES);
 	AddShape(Plane,-1,TRIANGLES);
 	AddShape(Plane,-1,TRIANGLES);

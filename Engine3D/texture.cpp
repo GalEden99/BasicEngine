@@ -42,6 +42,7 @@ static unsigned char* sobel(unsigned char* data, int width, int height)
     return sobeldImage;
 }
 
+// Halfton Pattern
 static unsigned char* halftone(unsigned char* data, int width, int height) {
     int len = width * height;
     int sqr = std::sqrt(len);
@@ -86,6 +87,7 @@ static unsigned char* halftone(unsigned char* data, int width, int height) {
     return outputImage;
 }
 
+// Floyd-Steinberg Algorithm
 static unsigned char* floyd(unsigned char* data, int width, int height) {
     int len = width * height;
     unsigned char* outputImage = new unsigned char[len];
@@ -115,6 +117,7 @@ static unsigned char* floyd(unsigned char* data, int width, int height) {
     
 }
 
+// Convert to GreyScale
 static unsigned char* convertImageToGreyScale(unsigned char* data,int width,int height) {
     int len = width * height;
     int sqr = std::sqrt(len);
@@ -126,10 +129,12 @@ static unsigned char* convertImageToGreyScale(unsigned char* data,int width,int 
         int b = data[i * 4 + 2];
 
         outputImage[i] = (r + g + b) / 3;
+    
     }
     return outputImage;
 }
 
+// Convert to Color
 static unsigned char* convertGrayScaleToColor(unsigned char* greyedImage,unsigned char* orginalData,int width,int height ) {
     int orginalLen = width * height * 4;
     int len = width * height;
@@ -148,6 +153,7 @@ static unsigned char* convertGrayScaleToColor(unsigned char* greyedImage,unsigne
     return outputImage;
 }  
 
+// Print to txt file
 void printToFileGreyScale (char* fileName ,unsigned char* data,int width,int height) {
         std::ofstream outputFile(fileName);
         if (outputFile.is_open())
@@ -168,6 +174,7 @@ void printToFileGreyScale (char* fileName ,unsigned char* data,int width,int hei
         }
 }
 
+// Print to txt file
 void printToFileBlackWhitevoid (char* fileName ,unsigned char* data,int width,int height) {
         std::ofstream outputFile(fileName);
         if (outputFile.is_open())
@@ -184,7 +191,6 @@ void printToFileBlackWhitevoid (char* fileName ,unsigned char* data,int width,in
             outputFile.close();
         }
 }
-
 
 static void printImage(unsigned char* data) {
     int len = strlen((char *) data);
@@ -226,24 +232,26 @@ Texture::Texture(const std::string& fileName,bool for2D,int textureIndx)
     unsigned char* data = stbi_load((fileName).c_str(), &width, &height, &numComponents, 4);
 
     unsigned char* greyed;
+    unsigned char* halftoned;
+    unsigned char* floyded;
     unsigned char* sobeled;
-
+    
     switch(textureIndx){
-        case 0:
+        case 0: // Halftone Pattern
             greyed = convertImageToGreyScale(data,width,height);
-            sobeled = halftone(greyed,width,height);
-            data = convertGrayScaleToColor(sobeled, data,width,height);
-            printToFileBlackWhitevoid("img5.txt",sobeled,width,height);
+            halftoned = halftone(greyed,width,height);
+            data = convertGrayScaleToColor(halftoned, data,width,height);
+            printToFileBlackWhitevoid("img5.txt",halftoned,width,height);
             break;
-        case 1:
+        case 1: // GreyScale
             break;
-        case 2:
+        case 2: // Floyd-Steinberg Algorithm
             greyed = convertImageToGreyScale(data,width,height);
-            sobeled = floyd(greyed,width,height);
-            data = convertGrayScaleToColor(sobeled, data,width,height);
-            printToFileGreyScale("img6.txt",sobeled,width,height);
+            floyded = floyd(greyed,width,height);
+            data = convertGrayScaleToColor(floyded, data,width,height);
+            printToFileGreyScale("img6.txt",floyded,width,height);
             break;
-        case 3:
+        case 3: // Sobel
             greyed = convertImageToGreyScale(data,width,height);
             sobeled = sobel(greyed,width,height);
             data = convertGrayScaleToColor(sobeled, data,width,height);
