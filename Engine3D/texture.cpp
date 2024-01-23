@@ -15,91 +15,33 @@ float gaussian(float x, float y, float sigma) {
 float gaussianDerivativeX(float x, float y, float sigma) {
     return (-x / (sigma * sigma)) * gaussian(x, y, sigma);
 }
-void createDoGMatrix(float sigma1, float sigma2, float dogMatrix[3][3]) {
-    for (int i = -1; i <= 1; ++i) {
-        for (int j = -1; j <= 1; ++j) {
-            // dogMatrix[i + 1][j + 1] = gaussianDerivativeX(i, j, sigma1);
 
-            dogMatrix[i+1][j+1] =  (1.0 / (2.0 * M_PI * sigma1 * sigma1)) *
-                           exp(-(pow(i / 2, 2) + pow(j / 2, 2)) / (2.0 * sigma1 * sigma1));
-        }
-    }
-}
 
-void convolution(unsigned char* inputImage, const float gaussKernel[3][3], float outputImage[256 * 256]) {
-    for (int i = 1; i < 255; ++i) {
-        for (int j = 1; j < 255; ++j) {
-            outputImage[i * 256 + j] = 0.0;
-            for (int k = -1; k <= 1; ++k) {
-                for (int l = -1; l <= 1; ++l) {
-                    outputImage[i * 256 + j] += inputImage[(i + k) * 256 + (j + l)] * gaussKernel[k + 1][l + 1];
+void convolution(int sqr, unsigned char* inputImage, const float gaussKernel[3][3], float outputImage[256 * 256]) {
+    unsigned char borderImage[sqr][sqr];
+        for (int i = 0; i < 256; ++i) {
+            for (int j = 0; j < 256; ++j) {
+                for (int k = -1; k <= 1; ++k) {
+                    for (int l = -1; l <= 1; ++l) {
+                        int x = i + k;
+                        int y = j + l;
+                        if (0 <= i + k <= 255 && 0 <= j + l <= 255) {
+                        borderImage[i][j] +=inputImage[(i + k) * 256 + (j + l)] * gaussKernel[k + 1][l + 1];
+                        }
+                    }
                 }
             }
         }
+    
+
+    for (int i = 0; i < 256; ++i) {
+        for (int j = 0; j < 256; ++j) {
+            outputImage[i * sqr + j] = borderImage[i][j];
+    
     }
 }
-
-void angels(int sqr,float outputImage[256*256],float output2[256*256],double angles[256*256]) {
-
-    float gx[3][3] = {{-1, 0, 1},
-                      {-2, 0, 2},
-                      {-1, 0, 1}};
-    float gy[3][3] = {{1,  2,  1},
-                      {0,  0,  0},
-                      {-1, -2, -1}};
-        for (int i = 1; i < sqr + 2; i++) {
-        for (int j = 1; j < sqr + 2; j++) {
-            float newPixelGx = outputImage[(i - 1)*sqr + j - 1] * gx[0][0] +
-                               outputImage[(i - 1)*sqr + j + 1] * gx[0][2] +
-                               outputImage[(i + 1)*sqr + j - 1] * gx[2][0] +
-                               outputImage[(i + 1)*sqr + j + 1] * gx[2][2] +
-                               outputImage[i*sqr + j - 1] * gx[1][0] +
-                               outputImage[i*sqr + j + 1] * gx[1][2];
-            float newPixelGy = outputImage[(i - 1) *sqr + j - 1] * gy[0][0] +
-                               outputImage[(i - 1) *sqr + j] * gy[0][1] +
-                               outputImage[(i - 1)*sqr + j + 1] * gy[0][2] +
-                               outputImage[(i + 1)*sqr + j - 1] * gy[2][0] +
-                               outputImage[(i + 1)*sqr + j] * gy[2][1] +
-                               outputImage[(i + 1)*sqr + j + 1] * gy[2][2];
-            float newPixel = (std::sqrt(newPixelGx * newPixelGx + newPixelGy * newPixelGy));
-
-                output2[i* sqr + j] = newPixel;
-
-                float angle = (std::atan2(newPixelGy, newPixelGx));
-                std::cout << "angeld" << angle << std::endl;;
-                angles[i* sqr + j] = angle;
-
-        }
-    }
 }
 
-void nonMaximumSuppression(const float gradientMagnitude[256 * 256], const float gradientOrientation[256 * 256], unsigned char* suppressedImage) {
-    for (int i = 1; i < 255; ++i) {
-        for (int j = 1; j < 255; ++j) {
-            float mag = gradientMagnitude[i * 256 + j];
-            float angle = gradientOrientation[i * 256 + j];
-
-            // Quantize the angle to 0, 45, 90, or 135 degrees
-            int quantizedAngle = static_cast<int>((angle + M_PI / 8) / (M_PI / 4)) % 4;
-
-            // Compare the magnitude with neighbors in the gradient direction
-            switch (quantizedAngle) {
-                case 0: // 0 degrees
-                    suppressedImage[i * 256 + j] = (mag >= gradientMagnitude[i * 256 + (j - 1)]) && (mag >= gradientMagnitude[i * 256 + (j + 1)]) ? mag : 0.0f;
-                    break;
-                case 1: // 45 degrees
-                    suppressedImage[i * 256 + j] = (mag >= gradientMagnitude[(i - 1) * 256 + (j + 1)]) && (mag >= gradientMagnitude[(i + 1) * 256 + (j - 1)]) ? mag : 0.0f;
-                    break;
-                case 2: // 90 degrees
-                    suppressedImage[i * 256 + j] = (mag >= gradientMagnitude[(i - 1) * 256 + j]) && (mag >= gradientMagnitude[(i + 1) * 256 + j]) ? mag : 0.0f;
-                    break;
-                case 3: // 135 degrees
-                    suppressedImage[i * 256 + j] = (mag >= gradientMagnitude[(i - 1) * 256 + (j - 1)]) && (mag >= gradientMagnitude[(i + 1) * 256 + (j + 1)]) ? mag : 0.0f;
-                    break;
-            }
-        }
-    }
-}
 
 
 
@@ -109,12 +51,20 @@ static unsigned char* canny(unsigned char* data, int width, int height)
     int len = width * height;
     int sqr = std::sqrt(len);
     
-    unsigned char* sobeldImage = new unsigned char[len];
-    float outputImage[len];
+    unsigned char* canniedImage = new unsigned char[len];
 
+    float outputImage[len];
     float gaussKernel[3][3];
-    createDoGMatrix(1.6, 2.0,gaussKernel);
-    convolution(data, gaussKernel, outputImage);
+    float sigma = 1.8;
+
+    for (int i = -1; i <= 1; ++i) {
+        for (int j = -1; j <= 1; ++j) {
+            gaussKernel[i+1][j+1] =  (1.0 / (2.0 * M_PI * sigma * sigma)) *
+                           exp(-(pow(i / 2, 2) + pow(j / 2, 2)) / (2.0 * sigma * sigma));
+        }
+    }
+
+    convolution(sqr,data, gaussKernel, outputImage);
     
 
     float output2[len];
@@ -173,13 +123,13 @@ static unsigned char* canny(unsigned char* data, int width, int height)
             }
 
             if (curr >= p1 && curr >= p2 && curr > 40) {
-                sobeldImage[i * sqr + j] = curr;
+                canniedImage[i * sqr + j] = curr;
             } else {
-                sobeldImage[i * sqr + j] = 0;
+                canniedImage[i * sqr + j] = 0;
             }
         }
     }
-    return sobeldImage;
+    return canniedImage;
 }
 
 // Halfton Pattern
@@ -339,9 +289,7 @@ static void printImage(unsigned char* data) {
         for (int j = 0; j < sqr; j++) {
             printf("%d ", data[i*sqr + j]);
         }
-        printf("\n");
     }
-        printf("len: %d\n", len);
 }
 
 Texture::Texture(const std::string& fileName)
