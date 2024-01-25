@@ -1,13 +1,13 @@
-//#define GLEW_STATIC
-// #define STBI_NO_STDIO
 #define STB_IMAGE_IMPLEMENTATION
 #include "texture.h"
 #include "stb_image.h"
 #include "../res/includes/glad/include/glad/glad.h"
 #include <iostream>
 #include <fstream>
+#include <cmath>
+#include <corecrt_math_defines.h>
 
-
+// Gaussian Blur
 float gaussian(float x, float y, float sigma) {
     return exp(-(x*x + y*y) / (2.0 * sigma * sigma));
 }
@@ -16,44 +16,41 @@ float gaussianDerivativeX(float x, float y, float sigma) {
     return (-x / (sigma * sigma)) * gaussian(x, y, sigma);
 }
 
+static void convolution(const int sqr, unsigned char* inputImage, const float gaussKernel[3][3], float outputImage[256 * 256]) {
+    unsigned char** borderImage = new unsigned char*[sqr];
+    for (int i = 0; i < sqr; ++i) {
+        for (int j = 0; j < sqr; ++j) {
+            borderImage[i] = new unsigned char[sqr];
+        }
+    }
 
-void convolution(int sqr, unsigned char* inputImage, const float gaussKernel[3][3], float outputImage[256 * 256]) {
-    unsigned char borderImage[sqr][sqr];
-        for (int i = 0; i < 256; ++i) {
-            for (int j = 0; j < 256; ++j) {
-                for (int k = -1; k <= 1; ++k) {
-                    for (int l = -1; l <= 1; ++l) {
-                        int x = i + k;
-                        int y = j + l;
-                        if (0 <= i + k <= 255 && 0 <= j + l <= 255) {
-                        borderImage[i][j] +=inputImage[(i + k) * 256 + (j + l)] * gaussKernel[k + 1][l + 1];
-                        }
+    for (int i = 0; i < 256; ++i) {
+        for (int j = 0; j < 256; ++j) {
+            for (int k = -1; k <= 1; ++k) {
+                for (int l = -1; l <= 1; ++l) {
+                    if (0 <= i + k <= 255 && 0 <= j + l <= 255) {
+                    borderImage[i][j] +=inputImage[(i + k) * 256 + (j + l)] * gaussKernel[k + 1][l + 1];
                     }
                 }
             }
         }
-    
+    }
 
     for (int i = 0; i < 256; ++i) {
         for (int j = 0; j < 256; ++j) {
             outputImage[i * sqr + j] = borderImage[i][j];
-    
+        }
     }
 }
-}
 
-
-
-
-
-static unsigned char* canny(unsigned char* data, int width, int height)
-{
+// Canny Edge Detection
+static unsigned char* canny(unsigned char* data, int width, int height){
     int len = width * height;
-    int sqr = std::sqrt(len);
+    const int sqr = std::sqrt(len);
     
     unsigned char* canniedImage = new unsigned char[len];
 
-    float outputImage[len];
+    float* outputImage = new float[len];
     float gaussKernel[3][3];
     float sigma = 1.8;
 
@@ -65,10 +62,10 @@ static unsigned char* canny(unsigned char* data, int width, int height)
     }
 
     convolution(sqr,data, gaussKernel, outputImage);
-    
 
-    float output2[len];
-    double angles[len];
+    float* output2 = new float[len];
+    double* angles = new double[len];
+
     float gx[3][3] = {{-1, 0, 1},
                       {-1.5, 0, 1.5},
                       {-1, 0, 1}};
@@ -76,8 +73,11 @@ static unsigned char* canny(unsigned char* data, int width, int height)
                       {0,  0,  0},
                       {-1, -1.5, -1}};
 
-    for (int i = 1; i < sqr + 2; i++) {
-        for (int j = 1; j < sqr + 2; j++) {
+    for (int i = 1; i < sqr; ++i) {
+        for (int j = 1; j < sqr; ++j) {
+            // std::cout << "i = " << i << std::endl;
+            // std::cout << "j = " << j << std::endl;
+
             float newPixelGx = outputImage[(i - 1)*sqr + j - 1] * gx[0][0] +
                                outputImage[(i - 1)*sqr + j + 1] * gx[0][2] +
                                outputImage[(i + 1)*sqr + j - 1] * gx[2][0] +
@@ -92,16 +92,19 @@ static unsigned char* canny(unsigned char* data, int width, int height)
                                outputImage[(i + 1)*sqr + j + 1] * gy[2][2];
             float newPixel = (std::sqrt(newPixelGx * newPixelGx + newPixelGy * newPixelGy));
 
-                output2[i* sqr + j] = newPixel;
+            // std::cout << "newPixelGx = " << newPixelGx << std::endl;
+            // std::cout << "newPixelGy = " << newPixelGy << std::endl;
+            // std::cout << "newPixel = " << newPixel << std::endl;
 
-                float angle = (std::atan2(newPixelGy, newPixelGx));
-                std::cout << "angeld" << angle << std::endl;;
-                angles[i* sqr + j] = angle;
+            output2[i* sqr + j] = newPixel;
 
+            float angle = (std::atan2(newPixelGy, newPixelGx));
+            // std::cout << "angeld " << angle << std::endl;
+            angles[i* sqr + j] = angle; 
         }
     }
 
-  // Non-maximum suppression for Sobel operator
+    // Non-maximum suppression for Sobel operator
     int ang = 180;
     for (int i = 1; i < sqr - 1; ++i) {
         for (int j = 1; j < sqr - 1; ++j) {
@@ -123,14 +126,15 @@ static unsigned char* canny(unsigned char* data, int width, int height)
             }
 
             if (curr >= p1 && curr >= p2 && curr > 40) {
-                canniedImage[i * sqr + j] = curr;
+                canniedImage[i * sqr + j] = 255; // white
             } else {
-                canniedImage[i * sqr + j] = 0;
+                canniedImage[i * sqr + j] = 0; // black
             }
         }
     }
     return canniedImage;
 }
+
 
 // Halfton Pattern
 static unsigned char* halftone(unsigned char* data, int width, int height) {
@@ -139,13 +143,13 @@ static unsigned char* halftone(unsigned char* data, int width, int height) {
     unsigned char* outputImage = new unsigned char[len];
     
     for (int i = 0; i< sqr; i+=2){
-        for (size_t j = 0; j < sqr; j+=2)
-        {
-          int pix1 = data[i*sqr + j];
-          int pix2 = data[i*sqr + j+1];
-          int pix3 = data[(i+1)*sqr + j];
-          int pix4 = data[(i+1)*sqr + j+1];
-          int avg = (pix1 + pix2 + pix3 + pix4) / 4;
+        for (size_t j = 0; j < sqr; j+=2){
+            int pix1 = data[i*sqr + j];
+            int pix2 = data[i*sqr + j+1];
+            int pix3 = data[(i+1)*sqr + j];
+            int pix4 = data[(i+1)*sqr + j+1];
+            int avg = (pix1 + pix2 + pix3 + pix4) / 4;
+
             if (avg < 50) {
                 outputImage[i*sqr + j] = 0;
                 outputImage[i*sqr + j+1] = 0;
@@ -177,62 +181,64 @@ static unsigned char* halftone(unsigned char* data, int width, int height) {
     return outputImage;
 }
 
+
 // Floyd-Steinberg Algorithm
 static unsigned char* floyd(unsigned char* data, int width, int height) {
     int len = width * height;
     unsigned char* outputImage = new unsigned char[len];
     for (int i = 0; i< width; i++){
-        for (size_t j = 0; j < height; j++)
-        {
+        for (size_t j = 0; j < height; j++){
             int oldPixel = data[i*height + j];
             int newPixel = (oldPixel / 16) * 16;
             outputImage[i*height + j] = newPixel;
 
             int quantError = oldPixel - newPixel;
-            if (j < height - 1) {
+            if (j < height - 1){
                 outputImage[i*height + j + 1] += quantError * 7 / 16;
             }
-            if (i < width - 1) {
-                if (j > 0) {
+
+            if (i < width - 1){
+                if (j > 0){
                     outputImage[i + 1*height + j - 1] += quantError * 3 / 16;
                 }
+
                 outputImage[i + 1*height + j] += quantError * 5 / 16;
+
                 if (j < width - 1) {
                     outputImage[(i + 1)*width + j + 1] += quantError * 1 / 16;
                 }
             }
         }
     }
-    return outputImage;
-    
+    return outputImage;  
 }
 
+
 // Convert to GreyScale
-static unsigned char* convertImageToGreyScale(unsigned char* data,int width,int height) {
+static unsigned char* convertImageToGreyScale(unsigned char* data, int width, int height){
     int len = width * height;
     int sqr = std::sqrt(len);
     unsigned char* outputImage = new unsigned char[len];
 
-    for (int i = 0; i < len; ++i) {
+    for (int i = 0; i < len; ++i){
         int r = data[i * 4 + 0];
         int g = data[i * 4 + 1];
         int b = data[i * 4 + 2];
 
         outputImage[i] = (r + g + b) / 3;
-    
     }
     return outputImage;
 }
 
 // Convert to Color
-static unsigned char* convertGrayScaleToColor(unsigned char* greyedImage,unsigned char* orginalData,int width,int height ) {
-    int orginalLen = width * height * 4;
-    int len = width * height;
+static unsigned char* convertGrayScaleToColor(unsigned char* greyedImage, unsigned char* orginalData, int width, int height){
+    int orginalLen = width*height*4;
+    int len = width*height;
     int sqr = std::sqrt(len);
     unsigned char* outputImage = new unsigned char[orginalLen];
     int index = 0;
-    for (int i = 1; i < sqr + 1; i++) {
-        for (int j = 1; j < sqr + 1; j++) {
+    for (int i = 1; i < sqr + 1; i++){
+        for (int j = 1; j < sqr + 1; j++){
             outputImage[index] = greyedImage[i*sqr + j];
             outputImage[index + 1] = greyedImage[i*sqr + j];
             outputImage[index + 2] = greyedImage[i*sqr + j];
@@ -244,42 +250,36 @@ static unsigned char* convertGrayScaleToColor(unsigned char* greyedImage,unsigne
 }  
 
 // Print to txt file
-void printToFileGreyScale (char* fileName ,unsigned char* data,int width,int height) {
+void printToFileGreyScale (char* fileName, unsigned char* data, int width, int height){
         std::ofstream outputFile(fileName);
-        if (outputFile.is_open())
-        {
+        if (outputFile.is_open()){
             printf("file opened\n");
-            for (int i = 0; i < width; i++)
-            {
-                for (int j = 0; j < height; j++)
-                {
+            for (int i = 0; i < width; i++){
+                for (int j = 0; j < height; j++){
                     outputFile << data[i * height + j] / 17 << ",";
                 }
                 outputFile << "\n";
             }
             outputFile.close();
         }
-        else {
+        else{
             printf("Unable to open file");
         }
 }
 
 // Print to txt file
-void printToFileBlackWhitevoid (char* fileName ,unsigned char* data,int width,int height) {
-        std::ofstream outputFile(fileName);
-        if (outputFile.is_open())
-        {
-            for (int i = 0; i < width; i++)
-            {
-                for (int j = 0; j < height; j++)
-                {
-                    int value = data[i * height + j] == 255 ? 1 : 0;
-                    outputFile << value << ",";
-                }
-                outputFile << "\n";
+void printToFileBlackWhitevoid (char* fileName ,unsigned char* data, int width, int height){
+    std::ofstream outputFile(fileName);
+    if (outputFile.is_open()){
+        for (int i = 0; i < width; i++){
+            for (int j = 0; j < height; j++){
+                int value = data[i * height + j] == 255 ? 1 : 0;
+                outputFile << value << ",";
             }
-            outputFile.close();
+            outputFile << "\n";
         }
+        outputFile.close();
+    }
 }
 
 static void printImage(unsigned char* data) {
@@ -292,8 +292,7 @@ static void printImage(unsigned char* data) {
     }
 }
 
-Texture::Texture(const std::string& fileName)
-{
+Texture::Texture(const std::string& fileName){
 	int width, height, numComponents;
     unsigned char* data = stbi_load((fileName).c_str(), &width, &height, &numComponents, 4);
 	
@@ -322,7 +321,8 @@ Texture::Texture(const std::string& fileName,bool for2D,int textureIndx)
     unsigned char* greyed;
     unsigned char* halftoned;
     unsigned char* floyded;
-    unsigned char* sobeled;
+    unsigned char* cannied;
+
     
     switch(textureIndx){
         case 0: // Halftone Pattern
@@ -339,12 +339,12 @@ Texture::Texture(const std::string& fileName,bool for2D,int textureIndx)
             data = convertGrayScaleToColor(floyded, data,width,height);
             printToFileGreyScale("img6.txt",floyded,width,height);
             break;
-        case 3: // Sobel
+        case 3: // Canny
             greyed = convertImageToGreyScale(data,width,height);
-            sobeled = canny(greyed,width,height);
-            data = convertGrayScaleToColor(sobeled, data,width,height);
-            printToFileBlackWhitevoid("img4.txt",sobeled,width,height);
-          break;
+            cannied = canny(greyed,width,height);
+            data = convertGrayScaleToColor(cannied,data,width,height);
+            printToFileBlackWhitevoid("img4.txt",cannied,width,height);
+            break;
     }
     
     if(data == NULL)
